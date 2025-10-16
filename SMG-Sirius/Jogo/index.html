@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sirius Jump Game</title>
+  <link rel="icon" href="Imagens/S - Copia (2).ico" type="image/png">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- Menu Inicial -->
+  <div id="menu">
+    <img src="Imagens/S.png" alt="Sirius Jump Logo" class="logo">
+    <h1>Sirius Jump</h1>
+    <label for="playerNameInput">Digite seu nome:</label>
+    <input type="text" id="playerNameInput" placeholder="Ex: Franchesco" maxlength="12">
+    <br>
+    <button id="startBtn">Iniciar Jogo</button>
+    <button id="rankingBtn">Ver Ranking</button>
+    <button id="instructionsBtn">Instruções</button>
+  </div>
+
+  <!-- Mensagem de Boas-vindas -->
+  <div id="welcomeMessage" class="hidden"></div>
+
+  <!-- Canvas do jogo -->
+  <canvas id="gameCanvas" width="320" height="480"></canvas>
+
+  <!-- Tela de Game Over -->
+  <div id="gameOverScreen">
+    <h2>Game Over</h2>
+    <p id="finalScore"></p>
+    <button id="restartBtn">Jogar Novamente</button>
+    <button id="backToMenuBtn">Menu</button>
+  </div>
+
+  <!-- Tela de Ranking -->
+  <div id="rankingScreen">
+    <img src="Imagens/S.png" alt="Sirius Jump Logo" class="logo">
+    <h2>Ranking</h2>
+    <ul id="rankingList"></ul>
+    <button id="clearRankingBtn">Limpar Ranking</button>
+    <button id="backToMenuFromRanking">Voltar</button>
+  </div>
+
+  <!-- Tela de Instruções -->
+  <div id="instructionsScreen">
+    <h2>Como Jogar</h2>
+    <p>Pressione <strong>Espaço</strong> ou <strong>Seta para Cima</strong> para fazer o robô pular.</p>
+    <p>Evite os canos verdes e tente alcançar a maior pontuação possível!</p>
+    <button id="backToMenuFromInstructions">Voltar</button>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
