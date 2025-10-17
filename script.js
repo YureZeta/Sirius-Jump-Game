@@ -83,20 +83,30 @@ function startGame() {
     frameCount = 0;
 
     menuSound.pause();
-    playSound(gameplaySound, true);
 
     document.addEventListener("keydown", fly);
     gameInterval = setInterval(updateGame, 20);
   }, 2000);
 }
 
+let gameplayStarted = false; // nova variável para controlar se o som começou
+
 function fly(e) {
   if (e.code === "Space" || e.code === "ArrowUp") {
     bird.velocity = bird.lift;
     jumpSound.currentTime = 0;
     jumpSound.play();
+
+    // Inicia a gameplay apenas no primeiro pulo
+    if (!gameplayStarted) {
+      gameplaySound.currentTime = 0;
+      gameplaySound.loop = true;
+      gameplaySound.play().catch(err => console.log(err));
+      gameplayStarted = true;
+    }
   }
 }
+
 
 function updateGame() {
   bird.velocity += bird.gravity;
@@ -173,7 +183,9 @@ function endGame() {
   clearInterval(gameInterval);
   document.removeEventListener("keydown", fly);
 
+  // Para o som da gameplay
   gameplaySound.pause();
+
   playSound(gameOverSound);
 
   canvas.style.display = "none";
@@ -182,6 +194,7 @@ function endGame() {
 
   saveScore(playerName, score);
 }
+
 
 // --- Ranking ---
 function saveScore(name, points) {
@@ -253,3 +266,4 @@ backToMenuFromInstructions.onclick = () => {
   menu.style.display = "block";
   playSound(menuSound);
 };
+
