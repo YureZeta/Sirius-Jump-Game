@@ -1,14 +1,18 @@
+// script.js - versão corrigida (visibilidade controlada por style.display)
+
 // Canvas
 const canvas = document.getElementById("gameCanvas");
 const ctx = canvas.getContext("2d");
 
-// Elementos
+// Elementos UI
 const menu = document.getElementById("menu");
+const difficultyScreen = document.getElementById("difficultyScreen");
+const welcomeMessage = document.getElementById("welcomeMessage");
+const countdown = document.getElementById("countdown");
 const gameOverScreen = document.getElementById("gameOverScreen");
 const rankingScreen = document.getElementById("rankingScreen");
 const instructionsScreen = document.getElementById("instructionsScreen");
 const rankingList = document.getElementById("rankingList");
-const welcomeMessage = document.getElementById("welcomeMessage");
 
 const playerNameInput = document.getElementById("playerNameInput");
 const startBtn = document.getElementById("startBtn");
@@ -19,96 +23,159 @@ const backToMenuFromRanking = document.getElementById("backToMenuFromRanking");
 const clearRankingBtn = document.getElementById("clearRankingBtn");
 const instructionsBtn = document.getElementById("instructionsBtn");
 const backToMenuFromInstructions = document.getElementById("backToMenuFromInstructions");
+const backToMenuFromDifficulty = document.getElementById("backToMenuFromDifficulty");
 
-// Sons
+// Sons (coloque os arquivos na pasta Sons/)
 const jumpSound = new Audio("Sons/Pulo.wav");
 const menuSound = new Audio("Sons/Menu&Ranking.mp3");
 const gameplaySound = new Audio("Sons/GamePlay.mp3");
 const gameOverSound = new Audio("Sons/GameOver.mp3");
 const pontoSound = new Audio("Sons/Ponto.mp3");
 
-// Imagens do robô (animações)
-const roboPulo = new Image();
-roboPulo.src = "Imagens/pulo.png";
-
-const roboQueda = new Image();
-roboQueda.src = "Imagens/queda.png";
+// Imagens
+const roboPulo = new Image(); roboPulo.src = "Imagens/pulo.png";
+const roboQueda = new Image(); roboQueda.src = "Imagens/queda.png";
 
 const BIRD_SIZE = 20;
 
-// Variáveis do jogo
-let bird, pipes, score, gameInterval, playerName;
+// Dificuldade - Opção A: muda apenas velocidade dos canos
+const pipeSpeedMap = { facil: 2, medio: 3, dificil: 4.3 };
+let selectedDifficulty = "medio";
+
+// Estado do jogo
+let bird, pipes, score, gameInterval;
 let frameCount = 0;
 let ultimoEstadoPulo = false;
 let tempoUltimoPulo = 0;
+let playerName = "";
+let gameRunning = false;
 
-// Mostrar menu inicial
-menu.style.display = "block";
-playSound(menuSound);
+// Carrega último nome salvo no localStorage
+const last = localStorage.getItem("flappyLastPlayer");
+if (last) playerNameInput.value = last;
 
-// Função para tocar som de forma organizada
+// Função para tocar som (com proteção para erro de autoplay)
 function playSound(sound, loop = false) {
-  if (loop) sound.loop = true;
-  else sound.loop = false;
-
-  sound.currentTime = 0;
-  sound.play().catch(err => console.log(err));
+  if (!sound) return;
+  sound.loop = loop;
+  try {
+    sound.currentTime = 0;
+    sound.play();
+  } catch (e) {}
 }
 
-// --- Funções do jogo ---
-function startGame() {
-  let name = playerNameInput.value.trim();
+// Inicializa visibilidade (garante estado consistente)
+function showMenu() {
+  menu.style.display = "block";
+  difficultyScreen.style.display = "none";
+  welcomeMessage.style.display = "none";
+  countdown.style.display = "none";
+  canvas.style.display = "none";
+  gameOverScreen.style.display = "none";
+  rankingScreen.style.display = "none";
+  instructionsScreen.style.display = "none";
+}
+showMenu();
+playSound(menuSound);
+
+// -------------------- Fluxo: iniciar → escolher dificuldade → contagem → jogo
+startBtn.onclick = () => {
+  const name = playerNameInput.value.trim();
   if (!name || name.length < 2) {
     alert("Digite um nome com pelo menos 2 caracteres!");
     return;
   }
   playerName = name;
-
+  localStorage.setItem("flappyLastPlayer", playerName); // salva último nome
+  // mostra tela de dificuldade
   menu.style.display = "none";
-  rankingScreen.style.display = "none";
-  gameOverScreen.style.display = "none";
-  instructionsScreen.style.display = "none";
+  difficultyScreen.style.display = "block";
+};
 
+// voltar da difficulty para menu
+backToMenuFromDifficulty.onclick = () => {
+  difficultyScreen.style.display = "none";
+  menu.style.display = "block";
+};
+
+// botões de dificuldade
+document.querySelectorAll(".difficultyBtn").forEach(btn => {
+  btn.addEventListener("click", () => {
+    const diff = btn.dataset.diff || "medio";
+    selectedDifficulty = diff;
+    difficultyScreen.style.display = "none";
+    startCountdown(); // inicia "Boa sorte" + contador
+  });
+});
+
+// Contagem regressiva (3s) com mensagem "Boa sorte, [nome]!"
+function startCountdown() {
   welcomeMessage.textContent = `Boa sorte, ${playerName}!`;
-  welcomeMessage.classList.remove("hidden");
+  welcomeMessage.style.display = "block";
   playSound(menuSound);
 
   setTimeout(() => {
-    welcomeMessage.classList.add("hidden");
-    canvas.style.display = "block";
+    welcomeMessage.style.display = "none";
+    let n = 3;
+    countdown.textContent = n;
+    countdown.style.display = "block";
 
-    bird = { x: 50, y: 150, width: BIRD_SIZE, height: BIRD_SIZE, gravity: 0.5, lift: -8, velocity: 0 };
-    pipes = [];
-    score = 0;
-    frameCount = 0;
-
-    menuSound.pause();
-
-    document.addEventListener("keydown", fly);
-    gameInterval = setInterval(updateGame, 20);
-  }, 2000);
+    const timer = setInterval(() => {
+      n--;
+      if (n >= 1) {
+        countdown.textContent = n;
+      } else if (n === 0) {
+        countdown.textContent = "GO!";
+      } else {
+        clearInterval(timer);
+        countdown.style.display = "none";
+        startGame();
+      }
+    }, 1000);
+  }, 1400);
 }
 
-let gameplayStarted = false; // nova variável para controlar se o som começou
+// Inicia o jogo propriamente dito
+function startGame() {
+  canvas.style.display = "block";
 
-function fly(e) {
-  if (e.code === "Space" || e.code === "ArrowUp") {
-    bird.velocity = bird.lift;
-    jumpSound.currentTime = 0;
-    jumpSound.play();
+  bird = { x: 50, y: 150, width: BIRD_SIZE, height: BIRD_SIZE, gravity: 0.5, lift: -8, velocity: 0 };
+  pipes = [];
+  score = 0;
+  frameCount = 0;
 
-    // Inicia a gameplay apenas no primeiro pulo
-    if (!gameplayStarted) {
-      gameplaySound.currentTime = 0;
-      gameplaySound.loop = true;
-      gameplaySound.play().catch(err => console.log(err));
-      gameplayStarted = true;
+  // som de gameplay
+  try { menuSound.pause(); } catch {}
+  playSound(gameplaySound, true);
+
+  if (gameInterval) clearInterval(gameInterval);
+  document.addEventListener("keydown", jump);
+  document.addEventListener("click", jump);
+  document.addEventListener("touchstart", jump, { passive: false });
+  gameInterval = setInterval(() => updateGame(pipeSpeedMap[selectedDifficulty]), 20);
+  gameRunning = true;
+}
+
+// Função de pulo
+function jump(e) {
+    e.preventDefault();
+    if(e.type === "keydown"){
+        if(e.code === "Space" || e.code === "ArrowUp"){
+            doJump();
+         }
     }
-  }
+    if(e.type === "click" || e.type === "touchstart"){
+        doJump();
+    }
 }
 
+function doJump() {
+    bird.velocity = bird.lift;
+    try { jumpSound.currentTime = 0; jumpSound.play(); } catch (e) {}
+}
 
-function updateGame() {
+// Atualiza o jogo (recebe pipeSpeed conforme dificuldade)
+function updateGame(currentPipeSpeed) {
   bird.velocity += bird.gravity;
   bird.y += bird.velocity;
 
@@ -120,42 +187,41 @@ function updateGame() {
 
   for (let i = pipes.length - 1; i >= 0; i--) {
     const pipe = pipes[i];
-    pipe.x -= 2;
+    pipe.x -= currentPipeSpeed;
 
-    // Colisão
+    // colisão
     if (
       bird.x < pipe.x + pipe.width &&
       bird.x + bird.width > pipe.x &&
       (bird.y < pipe.topHeight || bird.y + bird.height > pipe.bottomY)
     ) {
       endGame();
-      return;
+      
     }
 
-    // Pontuação
+    // pontuação
     if (!pipe.passed && pipe.x + pipe.width < bird.x) {
       pipe.passed = true;
       score++;
-      pontoSound.currentTime = 0;
-      pontoSound.play();
+      try { pontoSound.currentTime = 0; pontoSound.play(); } catch (e) {}
     }
 
-    // Remove canos fora da tela
     if (pipe.x + pipe.width < 0) pipes.splice(i, 1);
   }
 
+  // colisão com chão/ceiling
   if (bird.y + bird.height > canvas.height || bird.y < 0) {
     endGame();
-    return;
+    
   }
 
   drawGame();
 }
 
+// Desenha o jogo
 function drawGame() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-  // Escolhe imagem do robô conforme movimento
   if (bird.velocity < -2) {
     ultimoEstadoPulo = true;
     tempoUltimoPulo = Date.now();
@@ -163,29 +229,30 @@ function drawGame() {
     ultimoEstadoPulo = false;
   }
 
-  let roboAtual = ultimoEstadoPulo ? roboPulo : roboQueda;
+  const roboAtual = ultimoEstadoPulo ? roboPulo : roboQueda;
   ctx.drawImage(roboAtual, bird.x, bird.y, BIRD_SIZE, BIRD_SIZE);
 
-  // Desenha canos
+  // canos
   ctx.fillStyle = "green";
   pipes.forEach(pipe => {
     ctx.fillRect(pipe.x, 0, pipe.width, pipe.topHeight);
     ctx.fillRect(pipe.x, pipe.bottomY, pipe.width, canvas.height - pipe.bottomY);
   });
 
-  // Pontuação
+  // pontuação
   ctx.fillStyle = "white";
   ctx.font = "20px Arial";
   ctx.fillText("Score: " + score, 10, 25);
 }
 
+// Fim do jogo
 function endGame() {
+  gameRunning = false;
   clearInterval(gameInterval);
-  document.removeEventListener("keydown", fly);
-
-  // Para o som da gameplay
-  gameplaySound.pause();
-
+  document.removeEventListener("keydown", jump);
+  document.removeEventListener("click", jump);
+  document.removeEventListener("touchstart", jump, { passive: false });
+  try { gameplaySound.pause(); } catch (e) {}
   playSound(gameOverSound);
 
   canvas.style.display = "none";
@@ -195,14 +262,14 @@ function endGame() {
   saveScore(playerName, score);
 }
 
-
-// --- Ranking ---
+// Ranking (localStorage)
 function saveScore(name, points) {
-  if (!name || typeof points !== "number" || points < 0) return;
-  let ranking = JSON.parse(localStorage.getItem("flappyRanking")) || [];
+  if (!name || typeof points !== "number") return;
+  const key = "flappyRanking";
+  let ranking = JSON.parse(localStorage.getItem(key)) || [];
   ranking.push({ name, points });
-  ranking.sort((a, b) => b.points - a.points);
-  localStorage.setItem("flappyRanking", JSON.stringify(ranking.slice(0, 10)));
+  ranking.sort((a,b) => b.points - a.points);
+  localStorage.setItem(key, JSON.stringify(ranking.slice(0,10)));
 }
 
 function showRanking() {
@@ -211,7 +278,6 @@ function showRanking() {
   canvas.style.display = "none";
   instructionsScreen.style.display = "none";
   rankingScreen.style.display = "block";
-
   playSound(menuSound);
 
   const ranking = JSON.parse(localStorage.getItem("flappyRanking")) || [];
@@ -221,8 +287,7 @@ function showRanking() {
   }
 
   rankingList.innerHTML = ranking
-    .filter(r => r && r.name && typeof r.points === "number")
-    .map((r, i) => `<li>${i + 1}. ${r.name} - ${r.points} pts</li>`)
+    .map((r,i) => `<li>${i+1}. ${r.name} - ${r.points} pts</li>`)
     .join("");
 }
 
@@ -233,19 +298,22 @@ function clearRanking() {
   }
 }
 
-// --- Botões ---
-startBtn.onclick = startGame;
+// Handlers UI
 restartBtn.onclick = () => {
-  playerNameInput.value = "";
-  menu.style.display = "block";
+  // mantém o nome no campo
+  playerNameInput.value = playerName || localStorage.getItem("flappyLastPlayer") || "";
   gameOverScreen.style.display = "none";
+  difficultyScreen.style.display = "block"; // volta para escolher dificuldade
   playSound(menuSound);
 };
+
 backToMenuBtn.onclick = () => {
   gameOverScreen.style.display = "none";
   menu.style.display = "block";
+  playerNameInput.value = playerName || localStorage.getItem("flappyLastPlayer") || "";
   playSound(menuSound);
 };
+
 rankingBtn.onclick = showRanking;
 backToMenuFromRanking.onclick = () => {
   rankingScreen.style.display = "none";
@@ -254,16 +322,13 @@ backToMenuFromRanking.onclick = () => {
 };
 clearRankingBtn.onclick = clearRanking;
 
-// --- Instruções ---
 instructionsBtn.onclick = () => {
   menu.style.display = "none";
   instructionsScreen.style.display = "block";
   playSound(menuSound);
 };
-
 backToMenuFromInstructions.onclick = () => {
   instructionsScreen.style.display = "none";
   menu.style.display = "block";
   playSound(menuSound);
 };
-
